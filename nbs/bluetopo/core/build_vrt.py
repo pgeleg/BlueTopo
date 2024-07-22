@@ -292,7 +292,7 @@ def add_vrt_rat(conn: sqlite3.Connection, utm: str, project_dir: str, vrt_path: 
         expected_fields["unqualified"] = [int, gdal.GFU_Generic]
         expected_fields["sensitive"] = [int, gdal.GFU_Generic]
     # refactor later
-    if data_source.lower() in ['S102V22']:
+    if data_source.lower() in ['s102v22']:
         expected_fields = dict(
             value=[int, gdal.GFU_MinMax],
             data_assessment=[int, gdal.GFU_Generic],
@@ -694,6 +694,18 @@ def main(project_dir: str, data_source: str = None, relative_to_vrt: bool = True
 
     elif data_source.lower() == "modeling":
         data_source = "Modeling"
+
+    elif data_source.lower() == "bag":
+        data_source = "BAG"
+        raise ValueError("VRT not currently available for BAG data")
+
+    elif data_source.lower() == "s102v21":
+        data_source = "S102V21"
+        raise ValueError("VRT not currently available for S102V21 data")
+
+    elif data_source.lower() == "s102v22":
+        data_source = "S102V22"
+        raise ValueError("VRT not currently available for S102V22 data")
 
     elif os.path.isdir(data_source):
         files = os.listdir(data_source)
