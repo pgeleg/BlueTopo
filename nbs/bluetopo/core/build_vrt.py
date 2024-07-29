@@ -300,7 +300,7 @@ def add_vrt_rat(conn: sqlite3.Connection, utm: str, project_dir: str, vrt_path: 
             significant_features=[float, gdal.GFU_Generic],
             feature_size=[str, gdal.GFU_Generic],
             # ?
-            featuresizevar=[float, gdal.GFU_Generic],
+            featuresizevar=[int, gdal.GFU_Generic],
             coverage=[int, gdal.GFU_Generic],
             bathy_coverage=[int, gdal.GFU_Generic],
             horizontal_uncert_fixed=[float, gdal.GFU_Generic],
@@ -310,7 +310,7 @@ def add_vrt_rat(conn: sqlite3.Connection, utm: str, project_dir: str, vrt_path: 
             source_survey_id=[str, gdal.GFU_Generic],
             source_institution=[str, gdal.GFU_Generic],
             # ?
-            bathymetricuncertaintytype=[str, gdal.GFU_Generic],
+            bathymetricuncertaintytype=[int, gdal.GFU_Generic],
         )
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM tiles WHERE utm = ?", (utm,))
@@ -322,7 +322,7 @@ def add_vrt_rat(conn: sqlite3.Connection, utm: str, project_dir: str, vrt_path: 
         if os.path.isfile(gtiff) is False:
             continue
         rat_file = os.path.join(project_dir, tile["rat_disk"])
-        if os.path.isfile(rat_file) is False:
+        if os.path.isfile(rat_file) is False and data_source.lower() != 's102v22':
             continue
         if data_source.lower() != 's102v22':
             ds = gdal.Open(gtiff)
@@ -355,7 +355,7 @@ def add_vrt_rat(conn: sqlite3.Connection, utm: str, project_dir: str, vrt_path: 
             for col in range(rat_n.GetColumnCount()):
                 entry_val = rat_n.GetValueAsString(row, col)
                 if rat_n.GetNameOfCol(col).lower() in ['featuresizevar', 'bathymetricuncertaintytype']:
-                    entry_val = 'TBD'
+                    entry_val = 0
                 curr.append(entry_val)
             surveys.append(curr)
     rat = gdal.RasterAttributeTable()
@@ -381,6 +381,8 @@ def add_vrt_rat(conn: sqlite3.Connection, utm: str, project_dir: str, vrt_path: 
             elif field_type == float:
                 rat.SetValueAsDouble(row_idx, col_idx, float(survey[col_idx]))
     vrt_ds = gdal.Open(vrt_path, 1)
+    if data_source.lower() =='s102v22':
+        vrt_ds.AddBand()
     contributor_band = vrt_ds.GetRasterBand(3)
     contributor_band.SetDefaultRAT(rat)
 
@@ -769,7 +771,7 @@ def main(project_dir: str, data_source: str = None, relative_to_vrt: bool = True
             utm_vrt = os.path.join(project_dir, rel_path)
             print(f"Building utm{ub_utm['utm']}...")
             create_vrt(vrt_list, utm_vrt, [32, 64], relative_to_vrt, data_source)
-            if data_source.lower() not in ('bag', 's102v21', 's102v22'):
+            if data_source.lower() not in ('bag', 's102v21'):
                 add_vrt_rat(conn, ub_utm["utm"], project_dir, utm_vrt, data_source)
             fields = {"utm_vrt": rel_path, "utm_ovr": None, "utm": ub_utm["utm"]}
             if os.path.isfile(os.path.join(project_dir, rel_path + ".ovr")):

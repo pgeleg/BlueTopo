@@ -35,6 +35,17 @@ SQLite {sqlite3.sqlite_version}
 Date {datetime.datetime.now()}
 """
 
+def adapt_datetime_iso(val):
+    """Adapt datetime.datetime to timezone-naive ISO 8601 date."""
+    return val.isoformat()
+
+sqlite3.register_adapter(datetime.datetime, adapt_datetime_iso)
+
+def convert_datetime(val):
+    """Convert ISO 8601 datetime to datetime.datetime object."""
+    return datetime.datetime.fromisoformat(val)
+
+sqlite3.register_converter("datetime", convert_datetime)
 
 def get_tessellation(
     conn: sqlite3.Connection,
@@ -65,7 +76,7 @@ def get_tessellation(
         the downloaded file path string.
     """
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM tileset")
+    cursor.execute("SELECT * FROM tileset WHERE tilescheme = 'Tessellation'")
     for tilescheme in [dict(row) for row in cursor.fetchall()]:
         try:
             os.remove(os.path.join(project_dir, tilescheme["location"]))
@@ -125,6 +136,87 @@ def get_tessellation(
     )
     conn.commit()
     return destination_name
+
+# refactor later
+def get_xml(
+    conn: sqlite3.Connection,
+    project_dir: str,
+    prefix: str,
+    data_source: str,
+    bucket: str = "noaa-ocs-nationalbathymetry-pds",
+) -> str:
+    """
+    Download XML from AWS.
+
+    Parameters
+    ----------
+    conn : sqlite3.Connection
+        database connection object.
+    project_dir : str
+        destination directory for project.
+    prefix : str
+        the prefix for the XML on AWS to find the file.
+    data_source : str
+        the data source for the project e.g. 'BlueTopo' or 'Modeling'.
+    bucket : str
+        AWS bucket for the National Bathymetric Source project.
+
+    Returns
+    -------
+    destination_name : str
+        the downloaded file path string.
+    """
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM tileset WHERE tilescheme = 'XML'")
+    for tilescheme in [dict(row) for row in cursor.fetchall()]:
+        try:
+            if os.path.isfile(os.path.join(project_dir, tilescheme["location"])):
+                os.remove(os.path.join(project_dir, tilescheme["location"]))
+        except (OSError, PermissionError):
+            continue
+    if data_source in ["S102V21", "S102V22"]:
+        cred = {
+            "aws_access_key_id": "",
+            "aws_secret_access_key": "",
+            "config": Config(signature_version=UNSIGNED),
+        }
+        client = boto3.client("s3", **cred)
+        pageinator = client.get_paginator("list_objects_v2")
+        objs = pageinator.paginate(Bucket=bucket, Prefix=prefix).build_full_result()
+        if "Contents" not in objs:
+            print(f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} {datetime.datetime.now().astimezone().tzname()}] {data_source}: No XML found in {prefix}")
+            return None
+        tileschemes = objs["Contents"]
+        tileschemes.sort(key=lambda x: x["LastModified"], reverse=True)
+        source_name = tileschemes[0]["Key"]
+        filename = os.path.basename(source_name)
+        relative = os.path.join(data_source, f"XML", filename)
+        if len(tileschemes) > 1:
+            print(f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} {datetime.datetime.now().astimezone().tzname()}] {data_source}: More than one XML found in {prefix}, using {filename}")
+        destination_name = os.path.join(project_dir, relative)
+        filename_renamed = 'CATALOG.XML'
+        relative_renamed = os.path.join(data_source, f"XML", filename_renamed)
+        destination_name_renamed = os.path.join(project_dir, relative_renamed)
+        if not os.path.exists(os.path.dirname(destination_name)):
+            os.makedirs(os.path.dirname(destination_name))
+        try:
+            client.download_file(bucket, source_name, destination_name)
+        except (OSError, PermissionError) as e:
+            print(f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} {datetime.datetime.now().astimezone().tzname()}] {data_source}: " "Failed to download XML " "possibly due to conflict with an open existing file. " "Please close all files and attempt again")
+            sys.exit(1)
+        try:
+            os.rename(destination_name, destination_name_renamed)
+        except (OSError, PermissionError) as e:
+            print(f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} {datetime.datetime.now().astimezone().tzname()}] {data_source}: " "Failed to rename XML to CATALOG.xml." "possibly due to conflict with an open existing file named CATALOG.XML. " "Please close all files and attempt again")
+            sys.exit(1)
+    print(f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} {datetime.datetime.now().astimezone().tzname()}] {data_source}: Downloaded {filename_renamed}")
+    cursor.execute(
+        """REPLACE INTO tileset(tilescheme, location, downloaded)
+                      VALUES(?, ?, ?)""",
+        ("XML", relative, datetime.datetime.now()),
+    )
+    conn.commit()
+    return destination_name_renamed
 
 
 def download_tiles(
@@ -977,11 +1069,13 @@ def main(
     elif data_source.lower() == "s102v21":
         data_source = "S102V21"
         geom_prefix = "Test-and-Evaluation/Navigation_Test_and_Evaluation/_Navigation_Tile_Scheme/Navigation_Tile_Scheme"
+        xml_prefix = "Test-and-Evaluation/Navigation_Test_and_Evaluation/S102V21/_CATALOG"
         tile_prefix = "Test-and-Evaluation/Navigation_Test_and_Evaluation/S102V21"
 
     elif data_source.lower() == "s102v22":
         data_source = "S102V22"
         geom_prefix = "Test-and-Evaluation/Navigation_Test_and_Evaluation/_Navigation_Tile_Scheme/Navigation_Tile_Scheme"
+        xml_prefix = "Test-and-Evaluation/Navigation_Test_and_Evaluation/S102V22/_CATALOG"
         tile_prefix = "Test-and-Evaluation/Navigation_Test_and_Evaluation/S102V22"
 
     elif os.path.isdir(data_source):
@@ -1008,6 +1102,9 @@ def main(
 
     conn = connect_to_survey_registry(project_dir, data_source)
     geom_file = get_tessellation(conn, project_dir, geom_prefix, data_source)
+
+    if data_source in ["S102V21", "S102V22"]:
+        get_xml(conn, project_dir, xml_prefix, data_source)
 
     if untrack_missing:
         untracked_tiles, untracked_sr, untracked_utms = sweep_files(conn, project_dir)
