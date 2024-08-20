@@ -221,7 +221,7 @@ def create_vrt(files: list, vrt_path: str, levels: list, relative_to_vrt: bool, 
     vrt_ndv = np.nan
     if data_source.lower() in ('bag', 's102v21', 's102v22'):
         vrt_ndv = 1000000
-    vrt_options = gdal.BuildVRTOptions(srcNodata=np.nan, VRTNodata=vrt_ndv, resampleAlg="near", resolution="highest")
+    vrt_options = gdal.BuildVRTOptions(options='-sd 1', srcNodata=np.nan, VRTNodata=vrt_ndv, resampleAlg="near", resolution="highest")
     cwd = os.getcwd()
     try:
         os.chdir(os.path.dirname(vrt_path))

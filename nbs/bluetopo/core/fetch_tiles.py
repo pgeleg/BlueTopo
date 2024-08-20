@@ -347,7 +347,10 @@ def download_tiles(
                         download_dict[tilename]["rat_verified"] = 'None'
                         download_dict[tilename]["rat_sha256_checksum"] = 'None'
                         download_dict[tilename]["geotiff"] = source_name
-                        download_dict[tilename]["geotiff_disk"] = os.path.join(data_source, f"UTM{fields['utm']}", os.path.basename(fields["geotiff_link"]))
+                        if data_source.lower() in ['bag']:
+                            download_dict[tilename]["geotiff_disk"] = os.path.join(data_source, f"UTM{fields['utm']}", os.path.basename(fields["geotiff_link"]))
+                        if data_source.lower() in ['s102v21', 's102v22']:
+                            download_dict[tilename]["geotiff_disk"] = os.path.join(data_source, "Data", os.path.basename(fields["geotiff_link"]))
                         download_dict[tilename]["geotiff_dest"] = os.path.join(project_dir, download_dict[tilename]["geotiff_disk"])
                         download_dict[tilename]["geotiff_verified"] = fields["geotiff_verified"]
                         download_dict[tilename]["geotiff_sha256_checksum"] = fields["geotiff_sha256_checksum"]
@@ -1069,13 +1072,13 @@ def main(
     elif data_source.lower() == "s102v21":
         data_source = "S102V21"
         geom_prefix = "Test-and-Evaluation/Navigation_Test_and_Evaluation/_Navigation_Tile_Scheme/Navigation_Tile_Scheme"
-        xml_prefix = "Test-and-Evaluation/Navigation_Test_and_Evaluation/S102V21/_CATALOG"
+        xml_prefix = "Test-and-Evaluation/Navigation_Test_and_Evaluation/S102V21/Data"
         tile_prefix = "Test-and-Evaluation/Navigation_Test_and_Evaluation/S102V21"
 
     elif data_source.lower() == "s102v22":
         data_source = "S102V22"
         geom_prefix = "Test-and-Evaluation/Navigation_Test_and_Evaluation/_Navigation_Tile_Scheme/Navigation_Tile_Scheme"
-        xml_prefix = "Test-and-Evaluation/Navigation_Test_and_Evaluation/S102V22/_CATALOG"
+        xml_prefix = "Test-and-Evaluation/Navigation_Test_and_Evaluation/S102V22/Data"
         tile_prefix = "Test-and-Evaluation/Navigation_Test_and_Evaluation/S102V22"
 
     elif os.path.isdir(data_source):
