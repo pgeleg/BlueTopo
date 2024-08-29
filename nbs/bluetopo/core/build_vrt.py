@@ -1756,12 +1756,12 @@ def main(project_dir: str, data_source: str = None, relative_to_vrt: bool = True
         data_source = "BAG"
 
     elif data_source.lower() == "s102v21":
-        if int(gdal.VersionInfo()) < 3090000:
+        if int(gdal.VersionInfo()) < 3080000:
             raise RuntimeError("Please update GDAL to >=3.8 to run build_vrt for S102V22.")
         data_source = "S102V21"
 
     elif data_source.lower() == "s102v22":
-        if int(gdal.VersionInfo()) < 3090000:
+        if int(gdal.VersionInfo()) < 3080000:
             raise RuntimeError("Please update GDAL to >=3.8 to run build_vrt for S102V22.")
         data_source = "S102V22"
 
