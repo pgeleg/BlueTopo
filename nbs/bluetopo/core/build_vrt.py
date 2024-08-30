@@ -915,14 +915,15 @@ def add_vrt_rat_pmn(conn: sqlite3.Connection, utm: str, project_dir: str, vrt_pa
             exist = False
             for survey in surveys:
                 if survey[0] == rat_n.GetValueAsString(row, 0):
-                    survey[1] = int(survey[1]) + rat_n.GetValueAsInt(row, 1)
-                    # this is the count field
-                    # GFU_PixelCount usage has support as int dtype in some
-                    # software so avoiding changing it to python float (double)
-                    # this is a temp solution to avoid overflow error which can
-                    # occur with generalization in vrts of extreme coverage
-                    if survey[1] > 2147483647:
-                        survey[1] = 2147483647
+                    if data_source.lower() != 's102v22' and rat_n.GetNameOfCol(1) == 'count':
+                        survey[1] = int(survey[1]) + rat_n.GetValueAsInt(row, 1)
+                        # this is the count field
+                        # GFU_PixelCount usage has support as int dtype in some
+                        # software so avoiding changing it to python float (double)
+                        # this is a temp solution to avoid overflow error which can
+                        # occur with generalization in vrts of extreme coverage
+                        if survey[1] > 2147483647:
+                            survey[1] = 2147483647
                     exist = True
                     break
             if exist:
